@@ -1,0 +1,108 @@
+<?php 
+include "generalscripts.php";
+$arr[0] = 1;
+$arr[1] = 2;
+$arr[2] = 3;
+$arr[3] = 4;
+$arr[4] = 5;
+$arr[5] = 6;
+$arr[6] = 7;
+$arr[7] = 8;
+$arr[8] = 9;
+$arr[9] = 10;
+echo binarySearch(4,$arr);
+
+?>
+
+<?php
+//importing genral scripts is required
+/*function type explained
+This function is there to gather the data from the database and put it in a form that will allow the program to read off the information it needs to produce the user defined style of CSV.
+The format that is used by the program to read of the data I have called the $new data fromat just to give it a name so that I can refure to it.
+The format is a set of embeded arrays where the first dimention refures to a row in the final CSV. The next dimention is an object that is split into  'data' which include the response to the questions. The second dimention also contains the meta data of the row in a raw form, this is for example the class ID. The class ID is a number and so will be of no use to the user and so the function that generates the array to feed into the CSV generating function looks this 'ID' up in the SQL database to find the raw text, in this example a class code 'BP1/AS2'
+The data element of the second dimention however contains an array where each element refurse to a question. We will call theis the third dimention of the main $new array for simplicity sake. Each element of the 3rd dimention is an arrayobject containing two elments 'QuestionsID' which is an inmterger refuring to a queston in the queston database. The other element is 'Response' this refurse to the summed response for this type. The summation prosses is chosen by the user from a list of: summing, taking the mean or finding the standard deviation. 
+type as oposed to element takes an input of the limiting summary. This could be by subject or by class for example. */
+function type($con,$type,$sum){
+	//Generate the SQL query to be submited to the database. The result must be ordered in the following way for the code later used in the while loop that retrives the request to work. The elements must first be sorted by the given $type this might be 'ClassID' for example. The elements within a given $type are then arraged in question order. For each question in each $type there will be many responses from many pupils. The responses (and individual elements of the result) are then arranged by 'PupilID'
+	//the ordering is crutial for the next peice of code. However the code should still be stable so long as $type is fed in correctly and the connection with the database has been retived
+	$QRY = "SELECT * FROM main ORDER BY " . $type . " ASC, QuestionsID ASC, PupilID ASC ";
+	//send the request generated in the last line to the SQL server and retrive the response 
+	$results= mysqli_query($con,$QRY);
+	//initiate $z. The variable will count through the pupils in what can be thought of as the fourth dimention of the $data varibale which is almost in $new form
+	$z = 0;
+	//initiate $y. This variable will count through the questions. This is used rather then the questionsID so that the array is continues
+	$y = -1;
+	//initiate $x. This variable will count throught the rows of the two be CSV
+	//the variable starts at -1 so that when it is updated on the first pass through the while loop it becomes "0" the first index of the array
+	$x = -1;
+	//inishiate variables to change x and y as they only change when either the qustion read from the db changes or the class read from the db changes
+	//initiate $ClassID this will hold the ID of the current $type. Class is only an example of the type of ID this varibale may hold but it still acts as a fitting name for the variable as it will often hold the class ID
+	//it starts at -1 so that it will never start the same as a value of ClassID (or any other ID) from the database thus causing $x to update and $y to reset
+	$ClassID=-1;
+	//QuestionsID like classID will hold the data of the current element so to detect a change throught the while.
+	//it too starts at -1 so that it will never be the same as a value from the database
+	$QuestionsID=-1;
+	//the following while loop, loops through the data fetched from the SQL database a few line back
+	while($row = mysqli_fetch_array($results)){
+		//The following IF statement checks for a change in the ClassID from the one we are currently looking at
+		//this is required because the response from the SQL database will be many elements of the same class, followed by more elements of a different class, followed by futher elements of yet another class ect
+		if($ClassID!=$row[$type]){
+			//increasing X allows us to store the data in futher elements(not just this pass of the while loop) in the same element of the first dimention of $data which is almost in $new format
+			$x++;
+			//update the classID we are looking at to the one in the element that has just been retrived from the database
+			$ClassID=$row[$type];
+			//reset $y so that we count from the zelth element of question again
+			$y=-1;
+			//store the information for this class/subject ect from that of the current $row that has been retrived from the response from the SQL database
+			$data[$x]['ClassID'] = $row['ClassID'];
+			$data[$x]['SubjectID'] = $row['SubjectID'];
+			$data[$x]['TeacherID'] = $row['TeacherID'];
+			$data[$x]['Annum'] = $row['Annum'];
+		}
+		//The following IF statement allows us to realise that a new set of questions are now comming from the SQL response this is one point where the ordering pointed out in the query is important
+		if($QuestionsID!=$row['QuestionsID']){
+			//we are now looking at a new question so increase counter pointing to  the elment we are looking for
+			$y++;
+			//Store the current question ID to the apropreate element of the $data array
+			$data[$x]['data'][$y]['QuestionsID'] = $row['QuestionsID'];
+			//reset the pupil count as we are now looking at a new question (this makes the array continues)
+			$z=0;
+		}
+		//store the response cell from the row just recived from the database 
+		$data[$x]['data'][$y]['Response'][$z] = $row['Response'];
+		//increase the counter to indicate we are going to be looking at another pupil next pass of the while loop
+		$z++;
+	}
+	//we almost have the the data in the $new format but not quite $data[$x]['data'][$y]['data'] is still an array
+	//we need to summarise this array
+	//The following for each loop loops through each $z element of the $data array. This dimention of the array corrisponds to what will eventually be the rows of the CSV
+	$x=0;
+	$y=0;
+	foreach($data as $element){
+		$y=0;
+		//the following for each loop loops through each question of the $data[]['data'] elements of the $data array
+		foreach($element['data'] as $question){
+			//this takes the information from the old data array and sums it to the new data array that is strucurally in the $new format but not wholly in the $new format as some of the meta data may be incorrect
+			$summary[$x]['data'][$y]['Response'] = sumArray($question['Response'],$sum);
+			//move the question ID information from the old array to the new one
+			$summary[$x]['data'][$y]['QuestionsID'] = $question['QuestionsID'];
+			$y++;
+		}
+		//if the $type is ClassID then it is meeningfull to talk about which subject the class was however as it is not meeningful to talk about which Teacher taught physics in the school for 2008-2009 (because their was not just one) the elemnts are filled with the string "MULTI"
+		if($type=="ClassID"){
+			$summary[$x]['ClassID'] = $element['ClassID'];
+			$summary[$x]['SubjectID'] = $element['SubjectID'];
+			$summary[$x]['TeacherID'] = $element['TeacherID'];
+			$summary[$x]['Annum'] = $element['Annum'];
+		}else{
+			$summary[$x]['ClassID'] = "MULTI";
+			$summary[$x]['SubjectID'] = "MULTI";
+			$summary[$x]['TeacherID'] = "MULTI";
+			$summary[$x]['Annum'] = "MULTI";
+		}
+		$x++;
+	}
+	//the $summary array is now in $new format and can be submitted for being read into the 2D array required to create the users CSV
+	return $summary;
+}
+?>

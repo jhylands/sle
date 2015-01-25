@@ -1,0 +1,201 @@
+<?php
+function outputCSV($filename,$data) {
+header("Content-type: application/octet-stream");
+header("Content-Disposition: attachment; filename=\"" . $filename . "\"");
+    $outstream = fopen("php://output", 'w');
+    function __outputCSV(&$vals, $key, $filehandler) {
+        fputcsv($filehandler, $vals, ',', '"');
+    }
+    array_walk($data, '__outputCSV', $outstream);
+    fclose($outstream);
+}
+
+function csvToArray($filename=''){
+	//check the files exists
+    if(file_exists($filename) && is_readable($filename)){
+		//create an array to store the lines
+		$data = array();
+		//if the file is opened without error
+		if (($handle = fopen($filename, 'r')) !== FALSE)
+		{
+			//go through the file line by line storing the line as an array to an element in the array $data
+			//WARNING parameter 1000 may be too small (suspectedly the number of lines to read~)
+			while (($row = fgetcsv($handle)) !== FALSE)
+			{
+				//add the data
+				$data[] = $row;
+				//echo "row";
+			}
+			fclose($handle);
+		}
+		return $data;
+	}
+}
+
+//a function to quicksort the data
+function quickSort($column,$data) {
+    if(!count($data)) return $data;
+    $pivot= $data[0][$column];
+	$pivotX = $data[0]['QuestionsID'];
+    $low = $high = array();
+    $length = count($data);
+    for($i=1; $i < $length; $i++) {
+        if($data[$i][$column] < $pivot) {
+            $low [] = $data[$i];
+        } elseif($data[$i][$column] < $pivot)  {
+            $high[] = $data[$i];
+        }else{
+		if($data[$i][$column] < $pivot) {
+            $low [] = $data[$i];
+        } elseif($data[$i]['QuestionsID'] < $pivot)  {
+            $high[] = $data[$i];
+		  }
+		}
+    } 
+    return array_merge(quickSort($column,$low), array($pivot), quickSort($column,$high));
+}
+//function to select summary method
+function arraySummary($arr,$type){
+	switch($type){
+	case 0:
+	//sum
+	return sumArray($arr);
+	break;
+	case 1:
+	//mean
+	return avgArray($arr);
+	break;
+	case 2:
+	//standard deviation of the array
+	return SDArray($arr);
+	break;
+	}
+}
+//function to sum an array
+function sumArray($arrArray){
+	$total = 0;
+	foreach($arrArray as $element){
+		$total+=$element;
+	}
+	return $total;
+}
+//function to calculate average value in array
+function avgArray($arrArray){
+	$average = sumArray($arrArray)/count($arrArray);
+	return $average;
+}
+//function to find the standard deveation of an array
+function SDArray($arrArray){
+	//mean of the squares minus the square of the means
+	$Variance = avgArray(sqrArray($arrArray))-(avgArray($arrArray))^2;
+	$SD = ($Variance)^0.5;
+	return $SD;	
+}
+//function to find an array where each element is the square of the input array
+function sqrArray($arr){
+	foreach($arr as $element){
+		$element = $element^2;
+	}
+	return $arr;
+}
+function getRowNames($con,$type,$summed){
+	$tableHeader = convertMainHeaderToTableHeader($type);
+	if($tableHeader!="Annum"){
+		//Get row names
+		$QRY = "SELECT * FROM " . $tableHeader . " ORDER BY PID ASC";
+		$results= mysqli_query($con,$QRY);
+		$x=1;
+		while($row = mysqli_fetch_array($results)){
+			$summed[$x][0] = $row[convertTypeToInColumnHeader($type)];
+			$x++;
+		}
+	}else{
+		$QRY = "SELECT DISTINCT * FROM main ORDER BY " . $type . " ASC, QuestionsID ASC, PupilID ASC";
+		$results= mysqli_query($con,$QRY);
+		$x=1;
+		while($row = mysqli_fetch_array($results)){
+			$summed[$x][0] = $row['Annum'];
+			$x++;
+		}
+	}
+	return $summed;
+}
+function convertTypeToInColumnHeader($type){
+	switch($type){
+	case "ClassID":
+		return "Code";
+	break;
+	case "SubjectID":
+		return "Subject";
+	break;
+	case "TeacherID":
+		return "Name";
+	break;
+	}
+}
+function convertMainHeaderToTableHeader($type){
+	switch($type){
+	case "ClassID":
+		return "class";
+	break;
+	case "SubjectID":
+		return "subjects";
+	break;
+	case "TeacherID":
+		return "teachers";
+	break;
+	case "Annum":
+		return "Annum";
+	break;
+	}
+}
+function getArrayOfData($con, $type, $summaryType){
+	//code to later  be put in a function
+	$QRY = "SELECT * FROM questions";
+	$results= mysqli_query($con,$QRY);
+	$x=2;
+	while($row = mysqli_fetch_array($results)){
+		$summed[0][$x] = $row['Question'];
+		$x++;
+	}
+	$summed = getRowNames($con,$type,$summed);
+	//select all the data from the database
+	$QRY = "SELECT * FROM main ORDER BY " . $type . " ASC, QuestionsID ASC, PupilID ASC ";
+	$results= mysqli_query($con,$QRY);
+	//initiate some variables to count through the data array
+	$z = 0;
+	$y = -1;
+	$x = -1;
+	//inishiate variables to change x and y as they only change when either the qustion read from the db changes or the class read from the db changes
+	$classHold=-1;
+	$questionHold=-1;
+		//recall the data retrived by SQL request
+	while($row = mysqli_fetch_array($results)){
+		//if the class has changed update y, reset x and update classHold
+		if($classHold!=$row[$type]){
+			$x++;
+			$classHold=$row[$type];
+			$y=0;
+		}
+		//if the question has changed update x, reset z and update questionHold
+		if($questionHold!=$row['QuestionsID']){
+			$y++;
+			$questionHold=$row['QuestionsID'];
+			$z=0;
+		}
+		$data[$x][$y][$z] = $row['Response'];
+			$z++;
+	}
+	$asClass=1;
+	$asQuestion=1;
+	foreach($data as $question){
+		$asQuestion = 1;
+		foreach($question as $clas){
+			$summed[$asClass][$asQuestion] = sumArray($clas,$summaryType);
+			$asQuestion++;
+		}
+		$asClass++;
+	}
+	return $summed;	
+}
+?>

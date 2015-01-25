@@ -1,0 +1,61 @@
+#entry{
+position:absolute;
+top:50%;
+left:50%;
+height:10em;
+width:20em;
+margin-left:-10em;
+margin-top:-10em;
+border:0px solid black;
+}
+#titlename{
+text-decoration:underline;
+font-size:56px;
+font-family:Tahoma, Geneva, sans-serif;
+}
+#incorrect{
+color:red;
+text-decoration:italic;
+font-family:Impact, Charcoal, sans-serif;
+}
+#logout{
+position:abosolute;
+text-align:right;
+}
+#dashbody{
+width:40em;
+border:1px solid black;
+border-collapse:collapse;
+text-align:center;
+}
+#questions{
+position:absolute;
+left:50%;
+height:10em;
+width:60em;
+margin-left:-16em;
+}
+.question{
+background-color:BBBBDD;
+color:000030;
+font-weight:700;
+font-family: Comic sans-serif;
+}
+.tabletop{
+background-color:black;
+color:white;
+font-weight:700;
+
+}
+.information{
+text-align:center;
+font-family:"Lucida Sans Unicode","Lucida Grande", sans-serif;
+}
+.dow1tdl{
+width:200px;
+padding-left:10px;
+}
+#tableOfTitles{
+border-collapse:collapse;
+margin:0 auto;
+}
